@@ -10,7 +10,7 @@ $ pip install psycopg2-binary
 $ brew install postgresql@10 # 12버전 error
 ```
 
-1. Create a new user in Postgres
+1. **Create a new user in Postgres**
 
    ```bash
    $ psql postgres
@@ -26,13 +26,13 @@ $ brew install postgresql@10 # 12버전 error
    postgres=# CREATE USER sample_user;
    ```
 
-2. Create a new database and give the new user access
+2. **Create a new database and give the new user access**
 
    ```sql
    postgres=# CREATE DATABASE [sample_database] WITH OWNER sample_user;
    ```
 
-3. List of roles
+3. **List of roles**
 
    ```sql
    postgres=# \du
@@ -46,7 +46,7 @@ $ brew install postgresql@10 # 12버전 error
     postgres  | Superuser, Create role, Create DB, Replication, Bypass RLS | {}
    ```
 
-4. Make a role
+4. **Make a role**
 
    ```sql
    postgres=# ALTER ROLE harryjjun CREATEDB;
@@ -68,13 +68,13 @@ $ brew install postgresql@10 # 12버전 error
    postgres=# \q
    ```
 
-5. login with user
+5. **login with user**
 
    ```bash
    $ psql [DB_NAME] -U [USER_NAME]
    ```
 
-6. List of databases
+6. **List of databases**
 
    ```SQL
    DB_NAME=> \l
@@ -92,18 +92,18 @@ $ brew install postgresql@10 # 12버전 error
 
 - settings.py
 
-```python
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'django_test',
-        'USER': 'root',
-        'PASSWORD': '',
-        'HOST': 'localhost',
-        'PORT': '',
-    }
-}
-```
+  ```python
+  DATABASES = {
+      'default': {
+          'ENGINE': 'django.db.backends.postgresql',
+          'NAME': 'django_test',
+          'USER': 'root',
+          'PASSWORD': '',
+          'HOST': 'localhost',
+          'PORT': '',
+      }
+  }
+  ```
 
 
 
@@ -113,31 +113,37 @@ DATABASES = {
 
 ### 2. Install architect
 
-```bash
-$ pip install architect
-```
+- 라이브러리 설치 후 모델에 다음과 같이 작성
 
-```python
-from django.db import models
-import architect
+  ```bash
+  $ pip install architect
+  ```
 
-# Create your models here.
-class Board(models.Model):
-    pass
+  ```python
+  from django.db import models
+  import architect
+  
+  # Create your models here.
+  class Board(models.Model):
+      pass
+  
+      def __str__(self):
+          return str(self.pk)
+  
+  
+  @architect.install('partition', type='range', subtype='integer', constraint='2', column='board_id')
+  class Article(models.Model):
+      title = models.CharField(max_length=30)
+      content = models.TextField()
+      board = models.ForeignKey(Board, on_delete=models.CASCADE)
+  
+      def __str__(self):
+          return self.title
+  ```
 
-    def __str__(self):
-        return str(self.pk)
+  - `board_id` 를 기준(2개)으로 article 의 파티션을 나누도록 설정
 
 
-@architect.install('partition', type='range', subtype='integer', constraint='2', column='board_id')
-class Article(models.Model):
-    title = models.CharField(max_length=30)
-    content = models.TextField()
-    board = models.ForeignKey(Board, on_delete=models.CASCADE)
-
-    def __str__(self):
-        return self.title
-```
 
 
 
@@ -191,71 +197,73 @@ $ psql [DB_NAME] -U [USER_NAME]
 
 
 
-- 보드 1에 글 3개 작성
+- 보드 1에 글 3개 작성 후 테이블 확인
 
-```sql
-hpweek=# SELECT * FROM articles_article;
- id |       title       | content | board_id 
-----+-------------------+---------+----------
-  1 | 1 board 의 1번 글 | 내용    |        1
-  2 | 1 board 의 2번 글 | 내용    |        1
-  3 | 1 board 의 3번 글 | 내용    |        1
-(3 rows)
+  ```
+  hpweek=# \dt
+  ```
 
-hpweek=# SELECT * FROM articles_article_1_2;
- id |       title       | content | board_id 
-----+-------------------+---------+----------
-  1 | 1 board 의 1번 글 | 내용    |        1
-  2 | 1 board 의 2번 글 | 내용    |        1
-  3 | 1 board 의 3번 글 | 내용    |        1
-(3 rows)
-```
+  ```sql
+                      List of relations
+   Schema |            Name            | Type  |   Owner   
+  --------+----------------------------+-------+-----------
+   public | articles_article           | table | harryjjun
+   public | articles_article_1_2       | table | harryjjun
+   public | articles_board             | table | harryjjun
+  ...
+  ```
 
+  ```sql
+  hpweek=# SELECT * FROM articles_article;
+   id |       title       | content | board_id 
+  ----+-------------------+---------+----------
+    1 | 1 board 의 1번 글 | 내용    |        1
+    2 | 1 board 의 2번 글 | 내용    |        1
+    3 | 1 board 의 3번 글 | 내용    |        1
+  (3 rows)
+  ```
 
+  ```sql
+  hpweek=# SELECT * FROM articles_article_1_2;
+   id |       title       | content | board_id 
+  ----+-------------------+---------+----------
+    1 | 1 board 의 1번 글 | 내용    |        1
+    2 | 1 board 의 2번 글 | 내용    |        1
+    3 | 1 board 의 3번 글 | 내용    |        1
+  (3 rows)
+  ```
 
-- 테이블 확인
-
-```ㄴ비
-hpweek=# \dt
-```
-
-```sql
-                    List of relations
- Schema |            Name            | Type  |   Owner   
---------+----------------------------+-------+-----------
- public | articles_article           | table | harryjjun
- public | articles_article_1_2       | table | harryjjun
- public | articles_board             | table | harryjjun
-...
-```
-
-
-
-- 보드 2에 글 하나 작성
-
-```sql
-hpweek=# SELECT * FROM articles_article;
- id |       title       | content | board_id 
-----+-------------------+---------+----------
-  1 | 1 board 의 1번 글 | 내용    |        1
-  2 | 1 board 의 2번 글 | 내용    |        1
-  3 | 1 board 의 3번 글 | 내용    |        1
-  4 | 2 board 의 1번 글 | 내용    |        2
-(4 rows)
-
-hpweek=# SELECT * FROM articles_article_1_2;
- id |       title       | content | board_id 
-----+-------------------+---------+----------
-  1 | 1 board 의 1번 글 | 내용    |        1
-  2 | 1 board 의 2번 글 | 내용    |        1
-  3 | 1 board 의 3번 글 | 내용    |        1
-  4 | 2 board 의 1번 글 | 내용    |        2
-(4 rows)
-```
+  - `articles_article_1_2` 테이블에는 board_id 가 1,2 인 article 만 작성된다.
 
 
 
-- 보드 3에 글 두개 작성
+- 보드 2에 글 1개 작성
+
+  ```sql
+  hpweek=# SELECT * FROM articles_article;
+   id |       title       | content | board_id 
+  ----+-------------------+---------+----------
+    1 | 1 board 의 1번 글 | 내용    |        1
+    2 | 1 board 의 2번 글 | 내용    |        1
+    3 | 1 board 의 3번 글 | 내용    |        1
+    4 | 2 board 의 1번 글 | 내용    |        2
+  (4 rows)
+  ```
+
+  ```sql
+  hpweek=# SELECT * FROM articles_article_1_2;
+   id |       title       | content | board_id 
+  ----+-------------------+---------+----------
+    1 | 1 board 의 1번 글 | 내용    |        1
+    2 | 1 board 의 2번 글 | 내용    |        1
+    3 | 1 board 의 3번 글 | 내용    |        1
+    4 | 2 board 의 1번 글 | 내용    |        2
+  (4 rows)
+  ```
+
+  
+
+- 보드 3에 글 2개 작성
 
   ```sql
                       List of relations
@@ -298,7 +306,7 @@ hpweek=# SELECT * FROM articles_article_1_2;
     6 | 3 board 의 2번 글 | 내용    |        3
   ```
 
-  - `board_id` 기준으로 2개씩 파티션되어 저장되고 있음. (e.g. 1과2, 3과4 ...)
+  - 역시나 `board_id` 기준으로 2개씩 분할되어 파티션되어 저장되고 있음. (e.g. 1과2, 3과4 ...)
 
 
 
